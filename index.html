@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+	<head>
+		<meta charset="utf-8"/>
+		<script src="http://d3js.org/d3.v5.min.js"></script>
+		<title>D3 Visualization</title>
+		<style type="text/css">
+
+			.rem_button {
+				background-color: #76d7c4; /* Green */
+				border: 1px solid #cdcdcd;
+				color: white;
+				padding: 15px 32px;
+				text-align: center;
+				text-decoration: none;
+				display: inline-block;
+				font-size: 16px;
+			}
+			select {
+				background: transparent;
+				border: none;
+				font-size: 16px;
+				height: 50px;
+				padding: 5px; /* If you add too much padding here, the options won't show in IE */
+				width: 268px;
+				-webkit-border-radius: 5px;
+				-moz-border-radius: 5px;
+				border-radius: 5px;
+				background-color: #76d7c4;
+				color: white;
+			}
+
+
+
+
+		</style>
+
+
+	</head>
+	<body style="background-color:white;">
+
+		<h2>What percent of census tracts in each state have broadband speeds greater than 20 Mpbs?</h2>
+
+		<div id = "svg_wrapper">
+			<div id = "dropdown">
+				<div id ="state_menu_add_div" style="display: inline-block;"><p>Add states here</p></div>
+				<div id ="state_menu_rem_div" style="display: inline-block;"><p>Remove states here</p></div>
+			</div>
+
+
+			<script type="text/javascript">
+
+			var margin = {top: 20, right: 20, bottom: 30, left: 40},   
+				  width = 1040 - margin.left - margin.right,    
+				  height = 500 - margin.top - margin.bottom;
+			var xpadding = 10;var ypadding = 10;var padding = 10;
+
+			var svg = d3.select("#svg_wrapper")
+			    .append("svg")
+			        .attr("width", width + margin.left + margin.right)
+			        .attr("height", height + margin.top + margin.bottom);
+			d3.json("https://storage.googleapis.com/thieme-us-query/final.json").then(function(data){
+				//set up initial graph
+				var get_L = ["date","VA", "ND","MO"];
+				var final_json_arr = [];
+				for(var i=0; i<data.length;i++){
+				  	var inner_temp_json = {};
+					for(var j=0;j<get_L.length;j++){
+				      inner_temp_json[get_L[j]]=data[i][get_L[j]];
+				    }
+				  	final_json_arr[i]=inner_temp_json;
+				}
+				active_data=final_json_arr;
+
+				makeGraph(active_data);
+
+				//add the dropdown menus that add and subtract states
+				var droptions = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA", "KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND", "OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
+
+				  d3.select("#state_menu_add_div")
+				 	.append("select", ":first-child");
+				      
+				  d3.select("select")
+				    .attr("id", "state_menu_add")
+				  	.selectAll("option")
+				  	.data(droptions)
+				      .enter()
+				      .insert("option")
+				      .attr("value", function(d){return d;})
+				      .text(function(d){return d;}); 
+				  
+				  for(var i =1; i<get_L.length; i++){
+				  	d3.select("#state_menu_rem_div")
+						.append("button")
+						.text(get_L[i])
+						.attr("id", "rem_button"+"_"+get_L[i])
+						.attr("class","rem_button")
+						.attr("value",get_L[i]);
+				  }
+
+
+
+				d3.select("#state_menu_add").on("change", function(){
+															add_state_to_graph(get_L, data);
+														  });
+				
+				//this gets rid of the button when it's clicked
+				document.getElementById("state_menu_rem_div").addEventListener("click",function(e) {
+		  			if (e.target && e.target.matches(".rem_button")) {
+		    			rem_state_from_graph(e.target.id,e.target.value, get_L, data);
+					}
+				});
+
+				function makeGraph(active_data){
+				  
+				  var parseTime = d3.timeParse("%Y-%m-%d");
+				//getting column names set up
+				  active_data.columns = Object.keys(active_data[0]);//loop that converts numbers into numeric
+				  active_data.forEach(function(d) {  
+					                      d.date = parseTime(d.date);  
+				                      	var arrayLength = d.length;  
+				                      	for (var i = 1; i < arrayLength; i++) {    
+				                      		d[i] = +d[i];  
+				                      	}
+				                    });
+				  // set the dimensions and margins of the graph
+
+				// set the ranges and the color scheme with category10
+				  var x = d3.scaleTime().range([xpadding, width-padding]),    
+				  	y = d3.scaleLinear().range([height-ypadding, padding]),    
+				  	z = d3.scaleOrdinal(d3.schemeCategory10);     
+				  var line = d3.line()
+				  			 .x(function(d){ return x(d.date);})
+				  			 .y(function(d) { return y(d.speeds);});
+				  // define the line function by setting up a loop of loops
+				  var states = active_data.columns
+				  				 .slice(1)
+				  				 .map(function(id) {  
+				  				 	return {    
+				  				 		id: id,    
+				  				 		values: active_data.map(function(d) {
+				  				 					return {
+				  				 						date: d.date, 
+				  				 						speeds: d[id]};    
+				  				 				})  
+				  				  	};
+				  				  });     
+				  // append the svg obgect to the body of the page
+				  // appends a 'group' element to 'svg'
+				  // moves the 'group' element to the top left margin
+				  svg.attr("width", width + margin.left + margin.right)  
+				     .attr("height", height + margin.top + margin.bottom)
+				  var g=svg.append("g")
+				  		 .attr("transform","translate(" + margin.left + "," + margin.top + ")");  
+				  // Scale the range of the data
+				  x.domain(d3.extent(active_data, function(d) { return d.date; }));
+				  y.domain([  
+				  			d3.min(states, function(c) {return d3.min(c.values, function(d) {return d.speeds;});}),  
+				  			d3.max(states, function(c) {return d3.max(c.values, function(d) { return d.speeds;});})
+				  		 ]);
+				  z.domain(states.map(function(c) { return c.id; }));
+				  // Add the X Axis
+				  svg.append("g")
+				     .attr("transform", "translate("+4*xpadding+"," +(height+ypadding) + ")")    
+				     .call(d3.axisBottom(x));
+				  // Add the Y Axis
+				  svg.append("g")    
+				     .attr("transform", "translate("+5*xpadding+"," + 2*ypadding + ")")    
+				     .call(d3.axisLeft(y));     
+				   //Add x axis label
+				  svg.append("text")             
+				      .attr("transform",
+				            "translate(" + (width/2) + " ," + 
+				                           (height + margin.top + 20) + ")")
+				      .style("text-anchor", "middle")
+				      .text("Date");
+				   //Add y axis label
+				  svg.append("text")
+				      .attr("transform", "rotate(-90)")
+				      .attr("y", 0)
+				      .attr("x",0 - (height / 2))
+				      .attr("dy", "1em")
+				      .style("text-anchor", "middle")
+				      .text("Percent of tract with speeds above 20 Mbps");    
+
+				  //this is actual loop of loops     
+				  var state = g.selectAll(".state")
+				  		     .data(states)    
+				  		     .enter().append("g") 
+				  		     .attr("class", "state");
+				  state.append("path")
+				       .attr("class", "line") 
+				       .attr("d", function(d) { return line(d.values); })
+				       .style("fill", "none")
+				       .style("stroke", function(d) { return z(d.id); });
+				  
+				  state.append("text")
+				  	 .datum(function(d){return {id: d.id, value: d.values[d.values.length - 1]}; })
+				  	 .attr("transform", function(d) { return "translate(" + x(d.value.date) + "," + y(d.value.speeds) + ")"; })
+				  	 .attr("x", 3)      
+				  	 .attr("dy", "0.35em")
+				  	 .style("font", "10px sans-serif")
+				  	 .text(function(d) { return d.id; });
+				        
+				}
+
+				function add_state_to_graph(get_L, data){
+
+		            var state_active = d3.select("#state_menu_add").node().value;
+		            get_L.push(state_active);
+		            var final_json_arr = [];
+		            for(var i=0; i<data.length;i++){
+		              	var inner_temp_json = {};
+		            	for(var j=0;j<get_L.length;j++){
+		                  inner_temp_json[get_L[j]]=data[i][get_L[j]];
+		                }
+		              	final_json_arr[i]=inner_temp_json;
+		            }
+		            console.log(get_L);
+		            active_data=final_json_arr;
+		            svg.selectAll("*").remove();
+		            d3.select("#state_menu_rem_div")
+		              .append("button")
+		              .text(state_active)
+		              .attr("id", "rem_button"+"_"+state_active)
+		              .attr("class","rem_button")
+		              .attr("value",state_active);
+		            makeGraph(active_data);
+				 }
+
+				 function rem_state_from_graph(clicked_id,clicked_val, get_L, data){
+		    		remove_ind(get_L, clicked_val);
+		            var final_json_arr = [];
+		            for(var i=0; i<data.length;i++){
+		              	var inner_temp_json = {};
+		            	for(var j=0;j<get_L.length;j++){
+		                  inner_temp_json[get_L[j]]=data[i][get_L[j]];
+		                }
+		              	final_json_arr[i]=inner_temp_json;
+		            }
+		            console.log(get_L);
+		            active_data=final_json_arr;
+		            svg.selectAll("*").remove();
+		            makeGraph(active_data);
+		            d3.select("#"+clicked_id).remove();
+				}
+
+				 function remove_ind(arr, what) {
+				    var found = arr.indexOf(what);
+
+				    while (found !== -1) {
+				        arr.splice(found, 1);
+				        found = arr.indexOf(what);
+				    }
+				}
+
+
+			});
+			</script>
+		</div>
+	</body>
+</html>
